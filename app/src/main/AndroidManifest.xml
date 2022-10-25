@@ -16,14 +16,14 @@
         android:theme="@style/Theme.FireBaseAuthTest"
         tools:targetApi="31">
         <activity
-            android:name=".ResultActivity"
+            android:name="com.example.firebaseauthtest.ResultActivity"
             android:exported="false" />
         <activity
-            android:name=".LoginActivity"
+            android:name="com.example.firebaseauthtest.LoginActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".SignUpActivity"
+            android:name="com.example.firebaseauthtest.SignUpActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>

@@ -3,11 +3,12 @@ package com.example.firebaseauthtest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -16,27 +17,24 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.google.android.gms.auth.GoogleAuthException;
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.api.Auth;
-import com.google.android.gms.auth.api.identity.SignInCredential;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.auth.api.signin.GoogleSignInResult;
-import com.google.android.gms.common.Scopes;
 import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.common.api.GoogleApi;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.FirebaseException;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GetTokenResult;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.auth.PhoneAuthCredential;
+import com.google.firebase.auth.PhoneAuthOptions;
+import com.google.firebase.auth.PhoneAuthProvider;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -44,13 +42,13 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
-import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class LoginActivity extends AppCompatActivity implements View.OnClickListener {
 
     private EditText edEmail, edPassword;
-    private Button btnLogin, btnBack;
-    private ImageView ivGoogleLogin;
+    private Button btnLogin, btnBack, btnSwitchMethod, btnLogout;
+    private ImageView ivGoogleLogin, ivSendCode;
 
     // Firebase Authentication
     private FirebaseAuth firebaseAuth;
@@ -64,6 +62,9 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
     private GoogleSignInOptions gso;
     private GoogleSignInClient gsc;
+
+    private boolean isPhoneNum;
+    private String verificationID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,10 +87,16 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         btnLogin        = findViewById(R.id.btn_login);
         btnBack         = findViewById(R.id.btn_back);
         ivGoogleLogin   = findViewById(R.id.iv_google);
+        ivSendCode      = findViewById(R.id.iv_send_code);
+        btnSwitchMethod = findViewById(R.id.btn_switch_method);
+        btnLogout       = findViewById(R.id.btn_logout);
 
         btnLogin.setOnClickListener(this);
         btnBack.setOnClickListener(this);
         ivGoogleLogin.setOnClickListener(this);
+        ivSendCode.setOnClickListener(this);
+        btnSwitchMethod.setOnClickListener(this);
+        btnLogout.setOnClickListener(this);
 
         initFirebase();
     }
@@ -132,7 +139,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                         FirebaseUser user = firebaseAuth.getCurrentUser();
 
                         if (user != null) {
-                            Toast.makeText(LoginActivity.this, "User: "+user.getEmail(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(LoginActivity.this, "Login Success!\nUser: "+user.getEmail(), Toast.LENGTH_SHORT).show();
                             Log.d(">>>", "User Id: "+user.getUid());
                             Log.d(">>>", "User Email: "+user.getEmail());
                             Log.d(">>>", "User Phone: "+user.getPhoneNumber());
@@ -148,26 +155,26 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                             });
 
                             // Not necessary
-//                            collectionReference.whereEqualTo("userId", currentUserId)
-//                                    .addSnapshotListener(new EventListener<QuerySnapshot>() {
-//                                        @Override
-//                                        public void onEvent(@Nullable QuerySnapshot value, @Nullable FirebaseFirestoreException error) {
-//                                            if (error != null) {
-//
-//                                            }
-//                                            if (value != null && !value.isEmpty()) {
-//                                                // Getting all QueryDocSnapshots
-//                                                for (QueryDocumentSnapshot snapshot : value) {
-//                                                    String emailUser = snapshot.getString("email");
-//                                                    // Move to Result Activity after registering user successfully
-//                                                    Intent intentResult = new Intent(LoginActivity.this, ResultActivity.class);
-//                                                    intentResult.putExtra("RESULT", "Login Successfully");
-//                                                    intentResult.putExtra("USER", emailUser);
-//                                                    startActivity(intentResult);
-//                                                }
-//                                            }
-//                                        }
-//                                    });
+                            collectionReference.whereEqualTo("userId", user.getUid())
+                                    .addSnapshotListener(new EventListener<QuerySnapshot>() {
+                                        @Override
+                                        public void onEvent(@Nullable QuerySnapshot value, @Nullable FirebaseFirestoreException error) {
+                                            if (error != null) {
+
+                                            }
+                                            if (value != null && !value.isEmpty()) {
+                                                // Getting all QueryDocSnapshots
+                                                for (QueryDocumentSnapshot snapshot : value) {
+                                                    String emailUser = snapshot.getString("email");
+                                                    // Move to Result Activity after registering user successfully
+                                                    Intent intentResult = new Intent(LoginActivity.this, ResultActivity.class);
+                                                    intentResult.putExtra("RESULT", "Login Successfully");
+                                                    intentResult.putExtra("USER", emailUser);
+                                                    startActivity(intentResult);
+                                                }
+                                            }
+                                        }
+                                    });
                         }
                     } else {
                         Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
@@ -220,7 +227,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                     FirebaseUser user = firebaseAuth.getCurrentUser();
 
                     if (user != null) {
-                        Toast.makeText(LoginActivity.this, "User: " + user.getEmail(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginActivity.this, "Login Success!\nUser: " + user.getEmail(), Toast.LENGTH_SHORT).show();
                         Log.d(">>>", "User Id: " + user.getUid());
                         Log.d(">>>", "User Email: " + user.getEmail());
                         Log.d(">>>", "User Phone: " + user.getPhoneNumber());
@@ -240,13 +247,91 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                         Toast.LENGTH_SHORT).show());
     }
 
-    @SuppressLint("NonConstantResourceId")
+    private void sendAuthCode() {
+        if (!TextUtils.isEmpty(edEmail.getText().toString().trim())) {
+            PhoneAuthOptions phoneAuthOptions = PhoneAuthOptions.newBuilder(firebaseAuth)
+                    .setPhoneNumber("+855"+edEmail.getText().toString().trim())
+                    .setTimeout(60L, TimeUnit.SECONDS)
+                    .setActivity(this)
+                    .setCallbacks(new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+
+                        @Override
+                        public void onVerificationCompleted(@NonNull PhoneAuthCredential phoneAuthCredential) {
+                            if (phoneAuthCredential.getSmsCode() != null) {
+                                verifyAuthCodeAndSignIn(phoneAuthCredential.getSmsCode());
+                            }
+                        }
+
+                        @Override
+                        public void onVerificationFailed(@NonNull FirebaseException e) {
+                            Toast.makeText(LoginActivity.this, "Authentication Failed", Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onCodeSent(@NonNull String s, @NonNull PhoneAuthProvider.ForceResendingToken forceResendingToken) {
+                            super.onCodeSent(s, forceResendingToken);
+                            Toast.makeText(LoginActivity.this, "Code has been sent", Toast.LENGTH_SHORT).show();
+                            verificationID = s;
+                        }
+
+                    }).build();
+
+            PhoneAuthProvider.verifyPhoneNumber(phoneAuthOptions);
+        }
+    }
+
+    private void verifyAuthCodeAndSignIn(String code) {
+        PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationID, code);
+
+        // inside this method we are checking if
+        // the code entered is correct or not.
+        firebaseAuth.signInWithCredential(credential)
+                .addOnSuccessListener(this, authResult -> {
+
+                    FirebaseUser user = firebaseAuth.getCurrentUser();
+
+                    if (user != null) {
+                        Toast.makeText(LoginActivity.this, "Login Success!\nUser: " + user.getPhoneNumber(), Toast.LENGTH_SHORT).show();
+                        Log.d(">>>", "User Id: " + user.getUid());
+                        Log.d(">>>", "User Email: " + user.getEmail());
+                        Log.d(">>>", "User Phone: " + user.getPhoneNumber());
+                        Log.d(">>>", "User Name: " + user.getDisplayName());
+                        user.getIdToken(true).addOnCompleteListener(new OnCompleteListener<GetTokenResult>() {
+                            @Override
+                            public void onComplete(@NonNull Task<GetTokenResult> task) {
+                                if (task.isSuccessful()) {
+                                    task.getResult();
+                                    Log.d(">>>", "User Auth Token: " + task.getResult().getToken());
+                                }
+                            }
+                        });
+                    }
+
+                }).addOnFailureListener(this, e -> Toast.makeText(LoginActivity.this, "Authentication failed.",
+                        Toast.LENGTH_SHORT).show());
+    }
+
+    private void changeBtnSendCodeColor() {
+        ivSendCode.setColorFilter(ContextCompat.getColor(this, R.color.dark_green));
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                ivSendCode.setColorFilter(ContextCompat.getColor(getApplicationContext(), R.color.light_green));
+            }
+        }, 60000);
+    }
+
+    @SuppressLint({"NonConstantResourceId", "SetTextI18n"})
     @Override
     public void onClick(View view) {
         try {
             switch (view.getId()) {
                 case R.id.btn_login:
-                    reqLoginWithFirebase();
+                    if (isPhoneNum) {
+                        verifyAuthCodeAndSignIn(edPassword.getText().toString().trim());
+                    } else  {
+                        reqLoginWithFirebase();
+                    }
                     break;
                 case R.id.iv_google:
                     reqLoginWithGoogleAccount();
@@ -255,6 +340,34 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                     Intent intentBack = new Intent(LoginActivity.this, SignUpActivity.class);
                     startActivity(intentBack);
                     finishAffinity();
+                    break;
+                case R.id.btn_switch_method:
+                    if (!isPhoneNum) {
+                        isPhoneNum = true;
+                        edEmail.setHint("Phone Number");
+                        edPassword.setHint("Verification Code");
+                        btnSwitchMethod.setText("Switch To Email");
+                        ivSendCode.setVisibility(View.VISIBLE);
+                    } else {
+                        isPhoneNum = false;
+                        edEmail.setHint("Email");
+                        edPassword.setHint("Password");
+                        btnSwitchMethod.setText("Switch To Phone Number");
+                        ivSendCode.setVisibility(View.GONE);
+                    }
+                    break;
+                case R.id.iv_send_code:
+                    changeBtnSendCodeColor();
+                    sendAuthCode();
+                    break;
+                case R.id.btn_logout:
+                    firebaseAuth.signOut();
+                    gsc.signOut().addOnCompleteListener(new OnCompleteListener<Void>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Void> task) {
+                            Toast.makeText(LoginActivity.this, "Logged Out!", Toast.LENGTH_SHORT).show();
+                        }
+                    });
                     break;
             }
         } catch (Exception e) {
