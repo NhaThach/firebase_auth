@@ -9,7 +9,10 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.InputType;
 import android.text.TextUtils;
+import android.text.method.HideReturnsTransformationMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -257,9 +260,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
                         @Override
                         public void onVerificationCompleted(@NonNull PhoneAuthCredential phoneAuthCredential) {
-                            if (phoneAuthCredential.getSmsCode() != null) {
-                                verifyAuthCodeAndSignIn(phoneAuthCredential.getSmsCode());
-                            }
+
                         }
 
                         @Override
@@ -345,16 +346,24 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                     if (!isPhoneNum) {
                         isPhoneNum = true;
                         edEmail.setHint("Phone Number");
+                        edEmail.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_CLASS_NUMBER);
                         edPassword.setHint("Verification Code");
+                        edPassword.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+                        edPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_CLASS_NUMBER);
                         btnSwitchMethod.setText("Switch To Email");
                         ivSendCode.setVisibility(View.VISIBLE);
                     } else {
                         isPhoneNum = false;
                         edEmail.setHint("Email");
+                        edEmail.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                         edPassword.setHint("Password");
+                        edPassword.setTransformationMethod(PasswordTransformationMethod.getInstance());
+                        edPassword.setInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
                         btnSwitchMethod.setText("Switch To Phone Number");
                         ivSendCode.setVisibility(View.GONE);
                     }
+                    edEmail.setText("");
+                    edPassword.setText("");
                     break;
                 case R.id.iv_send_code:
                     changeBtnSendCodeColor();
